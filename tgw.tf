@@ -160,7 +160,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "tgw" {
   subnet_ids             = aws_subnet.tgw[*].id
   transit_gateway_id     = var.transit_gateway_id
   vpc_id                 = local.vpc_id
-  appliance_mode_support = var.enable_appliance_mode_support
+  appliance_mode_support = try(var.enable_appliance_mode_support, false) ? "enable" : "disable"
 
   tags = merge(
     { Name = "${var.name_prefix}-${var.short_aws_region}-tgw-att-${var.tgw_att_suffix}" }

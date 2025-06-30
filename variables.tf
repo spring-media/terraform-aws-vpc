@@ -1884,3 +1884,22 @@ variable "gwlb_subnet_suffix" {
   type        = string
   default     = "gwlb"
 }
+
+variable "target_account_id" {
+  description = "The AWS account ID of the target account where the VPC will be created"
+  type        = string
+}
+
+################################################################################
+# Tags
+################################################################################
+
+variable "team_name" {
+  type        = string
+  description = "Name of the team"
+}
+
+variable "environment_name" {
+  type        = string
+  description = "Environment name for the team e.g. dev or prd"
+}

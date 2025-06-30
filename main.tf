@@ -21,8 +21,9 @@ locals {
     aws_vpc_ipv4_cidr_block_association.second_cidr_block_assoc[0].vpc_id,
     aws_vpc_ipv4_cidr_block_association.second_cidr_ipam_block_assoc[0].vpc_id,
   aws_vpc.this[0].id, "")
-  create_vpc  = var.create_vpc && var.putin_khuylo
-  create_gwlb = var.create_gwlb
+  create_vpc                       = var.create_vpc && var.putin_khuylo
+  create_gwlb                      = var.create_gwlb
+  inspection-gwlb-endpoint-service = "inspection-gwlb-endpoint-service"
 }
 
 ################################################################################
@@ -247,18 +248,18 @@ resource "aws_network_acl_rule" "public_outbound" {
 ################################################################################
 # GWLB Subnets
 ################################################################################
-# data "aws_vpc_endpoint_service" "gwlb_endpoint_service" {
-#   provider = aws.ocp_inspection_network
-#   filter {
-#     name   = "tag:Name"
-#     values = [local.inspection-gwlb-endpoint-service]
-#   }
-# }
+
 locals {
   subnets_gwlb = local.create_gwlb ? cidrsubnets(aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr, 2, 2, 2, 2) : []
-  #  availability_zones    = ["az1", "az2", "az3"]
-  first_three_cidr_gwlb = local.create_gwlb ? { for idx, val in slice(local.subnets_gwlb, 0, 3) : val => { value : val, az : var.azs[idx] } } : {}
-  ipam_pool_name        = "private-euc1-test-prod-workload"
+
+  first_three_cidr_gwlb = local.create_gwlb ? {
+    for idx in range(0, 3) :
+    idx => {
+      cidr = local.subnets_gwlb[idx]
+      az   = var.azs[idx]
+    }
+  } : {}
+  ipam_pool_name = "private-euc1-test-prod-workload" ## TOBECHANGED
 }
 
 data "aws_vpc_ipam_pool" "private" {
@@ -294,14 +295,58 @@ resource "aws_subnet" "gwlb" {
   for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
 
   vpc_id            = local.vpc_id
-  cidr_block        = each.value.value
-  availability_zone = var.azs[each.value.az]
+  cidr_block        = each.value.cidr
+  availability_zone = each.value.az
 
   tags = {
-    Name = "dkern42HC-stgHC-${var.short_aws_region}-${each.value.az}-sub-gwlb"
+    Name = "dkern42HC-stgHC-${var.short_aws_region}-${each.value.az}-sub-gwlb" # TOBECHANGED
   }
 }
 
+resource "aws_route_table" "gwlb" {
+  for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
+
+  vpc_id = local.vpc_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.this[0].id # must be defined or passed in
+  }
+
+  route {
+    cidr_block = each.value.cidr
+    gateway_id = "local"
+  }
+
+  route {
+    cidr_block = aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr
+    gateway_id = "local"
+  }
+  tags = {
+    Name = "${var.team_name}-${var.environment_name}-${var.short_aws_region}-gwlb-rt"
+  }
+}
+
+resource "aws_route_table_association" "gwlb_rt" {
+  for_each = aws_subnet.gwlb
+
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.gwlb[each.key].id
+}
+
+
+resource "aws_vpc_endpoint" "gwlb_endpoint" {
+  for_each = aws_subnet.gwlb
+
+  vpc_id            = local.vpc_id
+  service_name      = aws_vpc_endpoint_service.gwlb_endpoint_service[0].service_name
+  subnet_ids        = [each.value.id]
+  vpc_endpoint_type = "GatewayLoadBalancer"
+
+  tags = {
+    Name = "${var.team_name}-${var.environment_name}-gwlb-${each.value.availability_zone_id}"
+  }
+}
 
 ################################################################################
 # Private Subnets

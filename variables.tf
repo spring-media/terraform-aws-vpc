@@ -1869,3 +1869,18 @@ variable "secondary_ipam_pool_netmask" {
   type        = list(number)
   default     = []
 }
+
+################################################################################
+# GWLB
+################################################################################
+
+variable "create_gwlb" {
+  description = "Controls if a Gateway Load Balancer is created for public subnets and the related routes that connect them"
+  type        = bool
+  default     = false
+}
+variable "gwlb_subnet_suffix" {
+  description = "Suffix to append to gwlb subnets name"
+  type        = string
+  default     = "gwlb"
+}

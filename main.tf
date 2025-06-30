@@ -17,11 +17,12 @@ locals {
   )
 
   # Use `local.vpc_id` to give a hint to Terraform that subnets should be deleted before secondary CIDR blocks can be free!
-  vpc_id     = try(
+  vpc_id = try(
     aws_vpc_ipv4_cidr_block_association.second_cidr_block_assoc[0].vpc_id,
     aws_vpc_ipv4_cidr_block_association.second_cidr_ipam_block_assoc[0].vpc_id,
-    aws_vpc.this[0].id, "")
-  create_vpc = var.create_vpc && var.putin_khuylo
+  aws_vpc.this[0].id, "")
+  create_vpc  = var.create_vpc && var.putin_khuylo
+  create_gwlb = var.create_gwlb
 }
 
 ################################################################################
@@ -242,6 +243,65 @@ resource "aws_network_acl_rule" "public_outbound" {
   cidr_block      = lookup(var.public_outbound_acl_rules[count.index], "cidr_block", null)
   ipv6_cidr_block = lookup(var.public_outbound_acl_rules[count.index], "ipv6_cidr_block", null)
 }
+
+################################################################################
+# GWLB Subnets
+################################################################################
+# data "aws_vpc_endpoint_service" "gwlb_endpoint_service" {
+#   provider = aws.ocp_inspection_network
+#   filter {
+#     name   = "tag:Name"
+#     values = [local.inspection-gwlb-endpoint-service]
+#   }
+# }
+locals {
+  subnets_gwlb = local.create_gwlb ? cidrsubnets(aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr, 2, 2, 2, 2) : []
+  #  availability_zones    = ["az1", "az2", "az3"]
+  first_three_cidr_gwlb = local.create_gwlb ? { for idx, val in slice(local.subnets_gwlb, 0, 3) : val => { value : val, az : var.azs[idx] } } : {}
+  ipam_pool_name        = "private-euc1-test-prod-workload"
+}
+
+data "aws_vpc_ipam_pool" "private" {
+  count = local.create_gwlb ? 1 : 0
+  filter {
+    name   = "description"
+    values = [local.ipam_pool_name]
+  }
+
+  filter {
+    name   = "address-family"
+    values = ["ipv4"]
+  }
+}
+
+resource "aws_vpc_ipam_pool_cidr_allocation" "gwlb" {
+  count = local.create_gwlb ? 1 : 0
+
+  ipam_pool_id   = data.aws_vpc_ipam_pool.private[0].id
+  netmask_length = 25
+}
+
+resource "aws_vpc_ipv4_cidr_block_association" "secondary_cidr" {
+  count = local.create_gwlb ? 1 : 0
+
+  vpc_id     = local.vpc_id
+  cidr_block = aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr
+}
+resource "aws_subnet" "gwlb" {
+  # count = local.create_gwlb ? 1 : 0
+
+  # for_each = local.first_three_cidr_gwlb if local.create_gwlb == true
+  for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
+
+  vpc_id            = local.vpc_id
+  cidr_block        = each.value.value
+  availability_zone = var.azs[each.value.az]
+
+  tags = {
+    Name = "dkern42HC-stgHC-${var.short_aws_region}-${each.value.az}-sub-gwlb"
+  }
+}
+
 
 ################################################################################
 # Private Subnets

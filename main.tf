@@ -314,15 +314,6 @@ resource "aws_route_table" "gwlb" {
     gateway_id = aws_internet_gateway.this[0].id # must be defined or passed in
   }
 
-  route {
-    cidr_block = each.value.cidr
-    gateway_id = "local"
-  }
-
-  route {
-    cidr_block = aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr
-    gateway_id = "local"
-  }
   tags = {
     Name = "${var.team_name}-${var.environment_name}-${var.short_aws_region}-gwlb-rt"
   }
@@ -337,7 +328,6 @@ resource "aws_route_table_association" "gwlb_rt" {
 
 
 resource "aws_vpc_endpoint" "gwlb_endpoint" {
-  provider = aws.ocp_inspection_network
 
   for_each = aws_subnet.gwlb
 

@@ -189,6 +189,11 @@ locals {
     for i in range(local.len_public_subnets) :
     aws_subnet.public[i].id => aws_route_table.public[i].id
   }
+
+  public_subnet_to_cidr = {
+    for i in range(local.len_public_subnets) :
+    aws_subnet.public[i].id => aws_subnet.public[i].cidr_block
+  }
 }
 
 resource "aws_route" "gwlb_vpc_endpoint" {
@@ -1227,7 +1232,7 @@ resource "aws_route_table" "gwlb_ingress" {
 
   tags = merge(
     {
-      "Name" = "${var.name_prefix}-${var.short_aws_region}gwlb_ingress"
+      "Name" = "${var.name_prefix}-${var.short_aws_region}-gwlb_ingress"
     },
     var.tags,
     var.intra_route_table_tags,
@@ -1235,12 +1240,17 @@ resource "aws_route_table" "gwlb_ingress" {
 }
 
 resource "aws_route" "gwlb_ingress_public" {
-  count = var.create_gwlb && local.create_public_subnets ? local.len_public_subnets : 0
+  for_each = {
+    for k, ep in aws_vpc_endpoint.gwlb_endpoint :
+    k => {
+      az          = local.gwlb_subnet_az_map[tolist(ep.subnet_ids)[0]]
+      endpoint_id = ep.id
+    }
+  }
 
   route_table_id         = aws_route_table.gwlb_ingress[0].id
-  destination_cidr_block = aws_subnet.public[count.index].cidr_block
-  vpc_endpoint_id        = aws_subnet.public[count.index].cidr_block
-
+  destination_cidr_block = local.public_subnet_to_cidr[local.public_subnet_az_map[each.value.az]]
+  vpc_endpoint_id        = each.value.endpoint_id
 }
 
 resource "aws_route_table_association" "ingress_edge_association" {

@@ -185,20 +185,37 @@ resource "aws_route_table_association" "public" {
 #     create = "5m"
 #   }
 # }
+
+
+
 locals {
-    gwlb_subnet_to_rt = {
-    for k, s in aws_subnet.gwlb :
-    s.id => aws_route_table.gwlb[k].id
+  gwlb_subnet_az_map = {
+    for i in aws_subnet.gwlb :
+    i.id => i.availability_zone
   }
+
+  public_subnet_az_map = {
+    for i in aws_subnet.public :
+    i.availability_zone => i.id
+  }
+
   public_subnet_to_rt = {
     for i in range(local.len_public_subnets) :
     aws_subnet.public[i].id => aws_route_table.public[i].id
   }
 }
+
 resource "aws_route" "gwlb_vpc_endpoint" {
   for_each = aws_vpc_endpoint.gwlb_endpoint
 
-  route_table_id         = local.public_subnet_to_rt[tolist(each.value.subnet_ids)[0]]
+  route_table_id = local.public_subnet_to_rt[
+    local.public_subnet_az_map[
+      local.gwlb_subnet_az_map[
+        tolist(each.value.subnet_ids)[0]
+      ]
+    ]
+  ]
+
   destination_cidr_block = "0.0.0.0/0"
   vpc_endpoint_id        = each.value.id
 

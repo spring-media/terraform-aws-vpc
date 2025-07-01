@@ -174,17 +174,39 @@ resource "aws_route_table_association" "public" {
   route_table_id = element(aws_route_table.public[*].id, var.create_multiple_public_route_tables ? count.index : 0)
 }
 
-resource "aws_route" "public_internet_gateway" {
-  count = local.create_public_subnets && var.create_igw ? local.num_public_route_tables : 0
+# resource "aws_route" "public_internet_gateway" {
+#   count = local.create_public_subnets && var.create_igw ? local.num_public_route_tables : 0
 
-  route_table_id         = aws_route_table.public[count.index].id
+#   route_table_id         = aws_route_table.public[count.index].id
+#   destination_cidr_block = "0.0.0.0/0"
+#   gateway_id             = aws_internet_gateway.this[0].id
+
+#   timeouts {
+#     create = "5m"
+#   }
+# }
+locals {
+    gwlb_subnet_to_rt = {
+    for k, s in aws_subnet.gwlb :
+    s.id => aws_route_table.gwlb[k].id
+  }
+  public_subnet_to_rt = {
+    for i in range(local.len_public_subnets) :
+    aws_subnet.public[i].id => aws_route_table.public[i].id
+  }
+}
+resource "aws_route" "gwlb_vpc_endpoint" {
+  for_each = aws_vpc_endpoint.gwlb_endpoint
+
+  route_table_id         = local.public_subnet_to_rt[tolist(each.value.subnet_ids)[0]]
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.this[0].id
+  vpc_endpoint_id        = each.value.id
 
   timeouts {
     create = "5m"
   }
 }
+
 
 resource "aws_route" "public_internet_gateway_ipv6" {
   count = local.create_public_subnets && var.create_igw && var.enable_ipv6 ? local.num_public_route_tables : 0
@@ -259,6 +281,7 @@ locals {
       az   = var.azs[idx]
     }
   } : {}
+
   ipam_pool_name = "private-euc1-test-prod-workload" ## TOBECHANGED
 }
 

@@ -304,6 +304,8 @@ resource "aws_subnet" "gwlb" {
 }
 
 resource "aws_route_table" "gwlb" {
+  provider = aws.ocp_inspection_network
+
   for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
 
   vpc_id = local.vpc_id
@@ -336,10 +338,12 @@ resource "aws_route_table_association" "gwlb_rt" {
 
 
 resource "aws_vpc_endpoint" "gwlb_endpoint" {
+  provider = aws.ocp_inspection_network
+
   for_each = aws_subnet.gwlb
 
   vpc_id            = local.vpc_id
-  service_name      = aws_vpc_endpoint_service.gwlb_endpoint_service[0].service_name
+  service_name      = data.aws_vpc_endpoint_service.gwlb_endpoint_service.service_name
   subnet_ids        = [each.value.id]
   vpc_endpoint_type = "GatewayLoadBalancer"
 

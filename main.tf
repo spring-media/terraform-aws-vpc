@@ -194,6 +194,14 @@ locals {
     for i in range(local.len_public_subnets) :
     aws_subnet.public[i].id => aws_subnet.public[i].cidr_block
   }
+  private_to_gwlb_routing = {
+    for i in range(local.len_private_subnets) :
+    i => {
+      rtb_id        = aws_route_table.private[i].id
+      cidr_block    = aws_subnet.public[i].cidr_block
+      gwlb_endpoint = aws_vpc_endpoint.gwlb_endpoint[tostring(i)].id
+    }
+  }
 }
 
 resource "aws_route" "gwlb_vpc_endpoint" {
@@ -442,6 +450,18 @@ resource "aws_route_table_association" "private" {
     aws_route_table.private[*].id,
     var.single_nat_gateway ? 0 : count.index,
   )
+}
+
+resource "aws_route" "to_gwlb_from_private" {
+  for_each = var.create_gwlb ? local.private_to_gwlb_routing : {}
+
+  route_table_id         = each.value.rtb_id
+  destination_cidr_block = each.value.cidr_block
+  vpc_endpoint_id        = each.value.gwlb_endpoint
+
+  timeouts {
+    create = "5m"
+  }
 }
 
 ################################################################################
@@ -1582,3 +1602,5 @@ resource "aws_default_route_table" "default" {
     var.default_route_table_tags,
   )
 }
+
+

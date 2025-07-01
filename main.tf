@@ -304,7 +304,6 @@ resource "aws_subnet" "gwlb" {
 }
 
 resource "aws_route_table" "gwlb" {
-  provider = aws.ocp_inspection_network
 
   for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
 

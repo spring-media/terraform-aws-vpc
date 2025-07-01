@@ -174,20 +174,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = element(aws_route_table.public[*].id, var.create_multiple_public_route_tables ? count.index : 0)
 }
 
-# resource "aws_route" "public_internet_gateway" {
-#   count = local.create_public_subnets && var.create_igw ? local.num_public_route_tables : 0
-
-#   route_table_id         = aws_route_table.public[count.index].id
-#   destination_cidr_block = "0.0.0.0/0"
-#   gateway_id             = aws_internet_gateway.this[0].id
-
-#   timeouts {
-#     create = "5m"
-#   }
-# }
-
-
-
 locals {
   gwlb_subnet_az_map = {
     for i in aws_subnet.gwlb :
@@ -1231,6 +1217,37 @@ resource "aws_route" "private_ipv6_egress" {
   route_table_id              = element(aws_route_table.private[*].id, count.index)
   destination_ipv6_cidr_block = "::/0"
   egress_only_gateway_id      = element(aws_egress_only_internet_gateway.this[*].id, 0)
+}
+
+
+resource "aws_route_table" "gwlb_ingress" {
+  count = var.create_gwlb ? 1 : 0
+
+  vpc_id = local.vpc_id
+
+  tags = merge(
+    {
+      "Name" = "${var.name_prefix}-${var.short_aws_region}gwlb_ingress"
+    },
+    var.tags,
+    var.intra_route_table_tags,
+  )
+}
+
+resource "aws_route" "gwlb_ingress_public" {
+  count = var.create_gwlb && local.create_public_subnets ? local.len_public_subnets : 0
+
+  route_table_id         = aws_route_table.gwlb_ingress[0].id
+  destination_cidr_block = aws_subnet.public[count.index].cidr_block
+  vpc_endpoint_id        = aws_subnet.public[count.index].cidr_block
+
+}
+
+resource "aws_route_table_association" "ingress_edge_association" {
+  count = var.create_gwlb ? 1 : 0
+
+  gateway_id     = aws_internet_gateway.this[0].id
+  route_table_id = aws_route_table.gwlb_ingress[0].id
 }
 
 ################################################################################

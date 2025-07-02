@@ -5,6 +5,9 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.70"
+      configuration_aliases = [
+        aws.ocp_inspection_network
+      ]
     }
   }
 }

@@ -340,6 +340,7 @@ resource "aws_subnet" "gwlb" {
   tags = {
     Name = "dkern42HC-stgHC-${var.short_aws_region}-${each.value.az}-sub-gwlb" # TOBECHANGED
   }
+  depends_on = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
 }
 
 resource "aws_route_table" "gwlb" {

@@ -328,9 +328,6 @@ resource "aws_vpc_ipv4_cidr_block_association" "secondary_cidr" {
   cidr_block = aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr
 }
 resource "aws_subnet" "gwlb" {
-  # count = local.create_gwlb ? 1 : 0
-
-  # for_each = local.first_three_cidr_gwlb if local.create_gwlb == true
   for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
 
   vpc_id            = local.vpc_id

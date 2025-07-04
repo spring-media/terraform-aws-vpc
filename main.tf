@@ -452,18 +452,6 @@ resource "aws_route_table_association" "private" {
   )
 }
 
-resource "aws_route" "to_gwlb_from_private" {
-  for_each = var.create_gwlb ? local.private_to_gwlb_routing : {}
-
-  route_table_id         = each.value.rtb_id
-  destination_cidr_block = each.value.cidr_block
-  vpc_endpoint_id        = each.value.gwlb_endpoint
-
-  timeouts {
-    create = "5m"
-  }
-}
-
 ################################################################################
 # Private Network ACLs
 ################################################################################
@@ -1602,5 +1590,3 @@ resource "aws_default_route_table" "default" {
     var.default_route_table_tags,
   )
 }
-
-

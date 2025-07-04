@@ -16,6 +16,18 @@ There are two main changes from the upstream code that are worth discussing:
   - By having this code here, we ensure the TGW Attachment subnets are created with the same logic as the other subnets, and at the same time
 
 ## List of Changes
+- **v0.4.0 GWLB Subnet for non web traffic [PE-4374](https://axelspringer.atlassian.net/browse/PE-4374)**
+  - Add allowed principal to the GWLB Service Endpoint in the central VPC
+  - Allocate a /25 CIDR from IPAM for the GWLB subnet
+  - Create a GWLB subnet for the endpoints
+  - Create a route table for GWLB subnet
+    - 0.0.0.0/0 -> IGW
+    - VPC_CIDR -> local
+  - Create GWLB endpoint in GWLB subnet
+  - Create ingress route table 
+    - Public subnet -> GWLB endpoint
+    - VPC_CIDR -> local
+
 
 - **Transit Gateway Attachment Subnet Creation** - [tgw.tf](./tgw.tf)
   - We now have a separate file that creates

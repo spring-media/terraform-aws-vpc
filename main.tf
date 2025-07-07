@@ -186,7 +186,7 @@ locals {
   }
 
   public_subnet_to_rt = {
-    for i in range(local.len_public_subnets) :
+    for i in range(local.num_public_route_tables) :
     aws_subnet.public[i].id => aws_route_table.public[i].id
   }
 
@@ -199,7 +199,7 @@ locals {
     i => {
       rtb_id        = aws_route_table.private[i].id
       cidr_block    = aws_subnet.public[i].cidr_block
-      gwlb_endpoint = aws_vpc_endpoint.gwlb_endpoint[tostring(i)].id
+      gwlb_endpoint = try(aws_vpc_endpoint.gwlb_endpoint[tostring(i)].id, null)
     }
   }
 }

@@ -335,7 +335,7 @@ resource "aws_subnet" "gwlb" {
   availability_zone = each.value.az
 
   tags = {
-    Name = "${team_name}-${var.environment_name}-${var.short_aws_region}-${each.value.az}-sub-gwlb"
+    Name = "${var.team_name}-${var.environment_name}-${var.short_aws_region}-${each.value.az}-sub-gwlb"
   }
   depends_on = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
 }

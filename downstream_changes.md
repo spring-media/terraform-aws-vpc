@@ -23,9 +23,9 @@ There are two main changes from the upstream code that are worth discussing:
   - Create a route table for GWLB subnet
     - 0.0.0.0/0 -> IGW
     - VPC_CIDR -> local
-  - Create GWLB endpoint in GWLB subnet
+  - Create one GWLB endpoint in every GWLB subnet
   - Create ingress route table 
-    - Public subnet -> GWLB endpoint
+    - Public subnet -> 1 GWLB endpoint in the same AZ
     - VPC_CIDR -> local
 
 

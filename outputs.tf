@@ -136,10 +136,6 @@ output "public_route_table_ids" {
   value       = local.public_route_table_ids
 }
 
-# output "public_internet_gateway_route_id" {
-#   description = "ID of the internet gateway route"
-#   value       = try(aws_route.public_internet_gateway[0].id, null)
-# }
 
 output "public_internet_gateway_ipv6_route_id" {
   description = "ID of the IPv6 internet gateway route"

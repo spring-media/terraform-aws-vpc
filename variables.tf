@@ -133,6 +133,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "ipam_pool_name" {
+  description = "value to use for the IPAM pool name. If not set, the pool name will be derived from the `name` variable"
+  type        = string
+  default     = null
+}
+
 ################################################################################
 # DHCP Options Set
 ################################################################################
@@ -215,12 +221,6 @@ variable "public_subnet_enable_resource_name_dns_aaaa_record_on_launch" {
 
 variable "public_subnet_enable_resource_name_dns_a_record_on_launch" {
   description = "Indicates whether to respond to DNS queries for instance hostnames with DNS A records. Default: `false`"
-  type        = bool
-  default     = false
-}
-
-variable "create_multiple_public_route_tables" {
-  description = "Indicates whether to create a separate route table for each public subnet. Default: `false`"
   type        = bool
   default     = false
 }

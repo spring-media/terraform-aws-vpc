@@ -146,7 +146,7 @@ resource "aws_subnet" "public" {
 }
 
 locals {
-  num_public_route_tables = var.create_multiple_public_route_tables ? local.len_public_subnets : 1
+  num_public_route_tables = var.create_gwlb ? local.len_public_subnets : 1
 }
 
 resource "aws_route_table" "public" {
@@ -156,7 +156,7 @@ resource "aws_route_table" "public" {
 
   tags = merge(
     {
-      "Name" = var.create_multiple_public_route_tables ? format(
+      "Name" = var.create_gwlb ? format(
         "%s-%s%s-rtb-%s", var.name_prefix, var.short_aws_region,
         substr(element(var.azs, count.index), -1, 1),
         var.public_subnet_suffix
@@ -171,7 +171,7 @@ resource "aws_route_table_association" "public" {
   count = local.create_public_subnets ? local.len_public_subnets : 0
 
   subnet_id      = element(aws_subnet.public[*].id, count.index)
-  route_table_id = element(aws_route_table.public[*].id, var.create_multiple_public_route_tables ? count.index : 0)
+  route_table_id = element(aws_route_table.public[*].id, var.create_gwlb ? count.index : 0)
 }
 
 locals {
@@ -298,7 +298,7 @@ locals {
     }
   } : {}
 
-  ipam_pool_name = "private-euc1-test-prod-workload" ## TOBECHANGED
+  ipam_pool_name = var.ipam_pool_name
 }
 
 data "aws_vpc_ipam_pool" "private" {

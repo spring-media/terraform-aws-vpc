@@ -28,7 +28,7 @@ module "vpc_with_flow_logs_s3_bucket" {
   source = "../../"
 
   name_prefix = local.name
-  cidr = local.vpc_cidr
+  cidr        = local.vpc_cidr
 
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]
@@ -45,7 +45,7 @@ module "vpc_with_flow_logs_s3_bucket_parquet" {
   source = "../../"
 
   name_prefix = "${local.name}-parquet"
-  cidr = local.vpc_cidr
+  cidr        = local.vpc_cidr
 
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]
@@ -64,7 +64,7 @@ module "vpc_with_flow_logs_cloudwatch_logs_default" {
   source = "../../"
 
   name_prefix = "${local.name}-cloudwatch-logs-default"
-  cidr = local.vpc_cidr
+  cidr        = local.vpc_cidr
 
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]
@@ -88,7 +88,7 @@ module "vpc_with_flow_logs_cloudwatch_logs_prefix" {
   source = "../../"
 
   name_prefix = "${local.name}-cloudwatch-logs-prefix"
-  cidr = local.vpc_cidr
+  cidr        = local.vpc_cidr
 
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]
@@ -117,7 +117,7 @@ module "vpc_with_flow_logs_cloudwatch_logs" {
   source = "../../"
 
   name_prefix = "${local.name}-cloudwatch-logs"
-  cidr = local.vpc_cidr
+  cidr        = local.vpc_cidr
 
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]

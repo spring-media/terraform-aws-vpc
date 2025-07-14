@@ -17,11 +17,13 @@ locals {
   )
 
   # Use `local.vpc_id` to give a hint to Terraform that subnets should be deleted before secondary CIDR blocks can be free!
-  vpc_id     = try(
+  vpc_id = try(
     aws_vpc_ipv4_cidr_block_association.second_cidr_block_assoc[0].vpc_id,
     aws_vpc_ipv4_cidr_block_association.second_cidr_ipam_block_assoc[0].vpc_id,
-    aws_vpc.this[0].id, "")
-  create_vpc = var.create_vpc && var.putin_khuylo
+  aws_vpc.this[0].id, "")
+  create_vpc                       = var.create_vpc && var.putin_khuylo
+  create_gwlb                      = var.create_gwlb
+  inspection-gwlb-endpoint-service = "inspection-gwlb-endpoint-service"
 }
 
 ################################################################################
@@ -144,7 +146,7 @@ resource "aws_subnet" "public" {
 }
 
 locals {
-  num_public_route_tables = var.create_multiple_public_route_tables ? local.len_public_subnets : 1
+  num_public_route_tables = var.create_gwlb ? local.len_public_subnets : 1
 }
 
 resource "aws_route_table" "public" {
@@ -154,7 +156,7 @@ resource "aws_route_table" "public" {
 
   tags = merge(
     {
-      "Name" = var.create_multiple_public_route_tables ? format(
+      "Name" = var.create_gwlb ? format(
         "%s-%s%s-rtb-%s", var.name_prefix, var.short_aws_region,
         substr(element(var.azs, count.index), -1, 1),
         var.public_subnet_suffix
@@ -169,20 +171,58 @@ resource "aws_route_table_association" "public" {
   count = local.create_public_subnets ? local.len_public_subnets : 0
 
   subnet_id      = element(aws_subnet.public[*].id, count.index)
-  route_table_id = element(aws_route_table.public[*].id, var.create_multiple_public_route_tables ? count.index : 0)
+  route_table_id = element(aws_route_table.public[*].id, var.create_gwlb ? count.index : 0)
 }
 
-resource "aws_route" "public_internet_gateway" {
-  count = local.create_public_subnets && var.create_igw ? local.num_public_route_tables : 0
+locals {
+  gwlb_subnet_az_map = {
+    for i in aws_subnet.gwlb :
+    i.id => i.availability_zone
+  }
 
-  route_table_id         = aws_route_table.public[count.index].id
+  public_subnet_az_map = {
+    for i in aws_subnet.public :
+    i.availability_zone => i.id
+  }
+
+  public_subnet_to_rt = {
+    for i in range(local.num_public_route_tables) :
+    aws_subnet.public[i].id => aws_route_table.public[i].id
+  }
+
+  public_subnet_to_cidr = {
+    for i in range(local.len_public_subnets) :
+    aws_subnet.public[i].id => aws_subnet.public[i].cidr_block
+  }
+  private_to_gwlb_routing = {
+    for i in range(local.len_private_subnets) :
+    i => {
+      rtb_id        = aws_route_table.private[i].id
+      cidr_block    = aws_subnet.public[i].cidr_block
+      gwlb_endpoint = try(aws_vpc_endpoint.gwlb_endpoint[tostring(i)].id, null)
+    }
+  }
+}
+
+resource "aws_route" "gwlb_vpc_endpoint" {
+  for_each = aws_vpc_endpoint.gwlb_endpoint
+
+  route_table_id = local.public_subnet_to_rt[
+    local.public_subnet_az_map[
+      local.gwlb_subnet_az_map[
+        tolist(each.value.subnet_ids)[0]
+      ]
+    ]
+  ]
+
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.this[0].id
+  vpc_endpoint_id        = each.value.id
 
   timeouts {
     create = "5m"
   }
 }
+
 
 resource "aws_route" "public_internet_gateway_ipv6" {
   count = local.create_public_subnets && var.create_igw && var.enable_ipv6 ? local.num_public_route_tables : 0
@@ -241,6 +281,101 @@ resource "aws_network_acl_rule" "public_outbound" {
   protocol        = var.public_outbound_acl_rules[count.index]["protocol"]
   cidr_block      = lookup(var.public_outbound_acl_rules[count.index], "cidr_block", null)
   ipv6_cidr_block = lookup(var.public_outbound_acl_rules[count.index], "ipv6_cidr_block", null)
+}
+
+################################################################################
+# GWLB Subnets
+################################################################################
+
+locals {
+  subnets_gwlb = local.create_gwlb ? cidrsubnets(aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr, 2, 2, 2, 2) : []
+
+  first_three_cidr_gwlb = local.create_gwlb ? {
+    for idx in range(0, 3) :
+    idx => {
+      cidr = local.subnets_gwlb[idx]
+      az   = var.azs[idx]
+    }
+  } : {}
+
+  ipam_pool_name = var.ipam_pool_name
+}
+
+data "aws_vpc_ipam_pool" "private" {
+  count = local.create_gwlb ? 1 : 0
+  filter {
+    name   = "description"
+    values = [local.ipam_pool_name]
+  }
+
+  filter {
+    name   = "address-family"
+    values = ["ipv4"]
+  }
+}
+
+resource "aws_vpc_ipam_pool_cidr_allocation" "gwlb" {
+  count = local.create_gwlb ? 1 : 0
+
+  ipam_pool_id   = data.aws_vpc_ipam_pool.private[0].id
+  netmask_length = 25
+}
+
+resource "aws_vpc_ipv4_cidr_block_association" "secondary_cidr" {
+  count = local.create_gwlb ? 1 : 0
+
+  vpc_id     = local.vpc_id
+  cidr_block = aws_vpc_ipam_pool_cidr_allocation.gwlb[0].cidr
+}
+resource "aws_subnet" "gwlb" {
+  for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
+
+  vpc_id            = local.vpc_id
+  cidr_block        = each.value.cidr
+  availability_zone = each.value.az
+
+  tags = {
+    Name = "${var.team_name}-${var.environment_name}-${var.short_aws_region}-${each.value.az}-sub-gwlb"
+  }
+  depends_on = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
+}
+
+resource "aws_route_table" "gwlb" {
+
+  for_each = local.create_gwlb ? local.first_three_cidr_gwlb : {}
+
+  vpc_id = local.vpc_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.this[0].id # must be defined or passed in
+  }
+
+  tags = {
+    Name = "${var.team_name}-${var.environment_name}-${var.short_aws_region}-gwlb-rt"
+  }
+}
+
+resource "aws_route_table_association" "gwlb_rt" {
+  for_each = aws_subnet.gwlb
+
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.gwlb[each.key].id
+}
+
+
+resource "aws_vpc_endpoint" "gwlb_endpoint" {
+
+  for_each = aws_subnet.gwlb
+
+  vpc_id            = local.vpc_id
+  service_name      = data.aws_vpc_endpoint_service.gwlb_endpoint_service.service_name
+  subnet_ids        = [each.value.id]
+  vpc_endpoint_type = "GatewayLoadBalancer"
+
+  tags = {
+    Name = "${var.team_name}-${var.environment_name}-gwlb-${each.value.availability_zone_id}"
+  }
 }
 
 ################################################################################
@@ -1093,6 +1228,42 @@ resource "aws_route" "private_ipv6_egress" {
   route_table_id              = element(aws_route_table.private[*].id, count.index)
   destination_ipv6_cidr_block = "::/0"
   egress_only_gateway_id      = element(aws_egress_only_internet_gateway.this[*].id, 0)
+}
+
+
+resource "aws_route_table" "gwlb_ingress" {
+  count = var.create_gwlb ? 1 : 0
+
+  vpc_id = local.vpc_id
+
+  tags = merge(
+    {
+      "Name" = "${var.name_prefix}-${var.short_aws_region}-gwlb_ingress"
+    },
+    var.tags,
+    var.intra_route_table_tags,
+  )
+}
+
+resource "aws_route" "gwlb_ingress_public" {
+  for_each = {
+    for k, ep in aws_vpc_endpoint.gwlb_endpoint :
+    k => {
+      az          = local.gwlb_subnet_az_map[tolist(ep.subnet_ids)[0]]
+      endpoint_id = ep.id
+    }
+  }
+
+  route_table_id         = aws_route_table.gwlb_ingress[0].id
+  destination_cidr_block = local.public_subnet_to_cidr[local.public_subnet_az_map[each.value.az]]
+  vpc_endpoint_id        = each.value.endpoint_id
+}
+
+resource "aws_route_table_association" "ingress_edge_association" {
+  count = var.create_gwlb ? 1 : 0
+
+  gateway_id     = aws_internet_gateway.this[0].id
+  route_table_id = aws_route_table.gwlb_ingress[0].id
 }
 
 ################################################################################

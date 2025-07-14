@@ -133,6 +133,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "ipam_pool_name" {
+  description = "value to use for the IPAM pool name. If not set, the pool name will be derived from the `name` variable"
+  type        = string
+  default     = null
+}
+
 ################################################################################
 # DHCP Options Set
 ################################################################################
@@ -215,12 +221,6 @@ variable "public_subnet_enable_resource_name_dns_aaaa_record_on_launch" {
 
 variable "public_subnet_enable_resource_name_dns_a_record_on_launch" {
   description = "Indicates whether to respond to DNS queries for instance hostnames with DNS A records. Default: `false`"
-  type        = bool
-  default     = false
-}
-
-variable "create_multiple_public_route_tables" {
-  description = "Indicates whether to create a separate route table for each public subnet. Default: `false`"
   type        = bool
   default     = false
 }
@@ -1868,4 +1868,38 @@ variable "secondary_ipam_pool_netmask" {
   description = "List of secondary IPAM pool netmasks to associate with the VPC to extend the IP Address pool"
   type        = list(number)
   default     = []
+}
+
+################################################################################
+# GWLB
+################################################################################
+
+variable "create_gwlb" {
+  description = "Controls if a Gateway Load Balancer is created for public subnets and the related routes that connect them"
+  type        = bool
+  default     = false
+}
+variable "gwlb_subnet_suffix" {
+  description = "Suffix to append to gwlb subnets name"
+  type        = string
+  default     = "gwlb"
+}
+
+variable "target_account_id" {
+  description = "The AWS account ID of the target account where the VPC will be created"
+  type        = string
+}
+
+################################################################################
+# Tags
+################################################################################
+
+variable "team_name" {
+  type        = string
+  description = "Name of the team"
+}
+
+variable "environment_name" {
+  type        = string
+  description = "Environment name for the team e.g. dev or prd"
 }

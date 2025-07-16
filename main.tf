@@ -223,7 +223,6 @@ resource "aws_route" "gwlb_vpc_endpoint" {
   }
 }
 
-
 resource "aws_route" "public_internet_gateway_ipv6" {
   count = local.create_public_subnets && var.create_igw && var.enable_ipv6 ? local.num_public_route_tables : 0
 

@@ -146,7 +146,7 @@ resource "aws_subnet" "public" {
 }
 
 locals {
-  num_public_route_tables = local.create_gwlb ? local.len_public_subnets : 1
+  num_public_route_tables = local.len_public_subnets
 }
 
 resource "aws_route_table" "public" {
